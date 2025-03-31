@@ -11,10 +11,13 @@ const API_TIMEOUT = 2000
 // APIリクエストのシミュレーション用の遅延時間 (ミリ秒)
 const SIMULATED_DELAY = 300
 
-interface ApiResponse<T> {
-  success: boolean
-  data: T
-  error?: string
+// シリアライズされたタスクの型定義
+interface SerializedTask {
+  id: string
+  title: string
+  startDate: string // ISO文字列形式
+  endDate: string // ISO文字列形式
+  color: string
 }
 
 /**
@@ -32,7 +35,8 @@ export class TaskApiClient {
 
       // ローカルストレージからタスクを取得
       const tasksJson = localStorage.getItem("gantt_tasks")
-      const tasks = tasksJson ? JSON.parse(tasksJson).map(this.deserializeTask) : []
+      const serializedTasks: SerializedTask[] = tasksJson ? JSON.parse(tasksJson) : []
+      const tasks = serializedTasks.map(this.deserializeTask)
 
       return {
         success: true,
@@ -57,7 +61,8 @@ export class TaskApiClient {
 
       // 既存のタスクを取得
       const tasksJson = localStorage.getItem("gantt_tasks")
-      const tasks = tasksJson ? JSON.parse(tasksJson).map(this.deserializeTask) : []
+      const serializedTasks: SerializedTask[] = tasksJson ? JSON.parse(tasksJson) : []
+      const tasks = serializedTasks.map(this.deserializeTask)
 
       // 新しいタスクを作成
       const newTask: Task = {
@@ -66,7 +71,8 @@ export class TaskApiClient {
       }
 
       // タスクを保存
-      localStorage.setItem("gantt_tasks", JSON.stringify([...tasks, this.serializeTask(newTask)]))
+      const updatedSerializedTasks = [...serializedTasks, this.serializeTask(newTask)]
+      localStorage.setItem("gantt_tasks", JSON.stringify(updatedSerializedTasks))
 
       return {
         success: true,
@@ -91,13 +97,13 @@ export class TaskApiClient {
 
       // 既存のタスクを取得
       const tasksJson = localStorage.getItem("gantt_tasks")
-      const tasks = tasksJson ? JSON.parse(tasksJson).map(this.deserializeTask) : []
+      const serializedTasks: SerializedTask[] = tasksJson ? JSON.parse(tasksJson) : []
 
       // タスクを更新
-      const updatedTasks = tasks.map((t) => (t.id === task.id ? this.serializeTask(task) : this.serializeTask(t)))
+      const updatedSerializedTasks = serializedTasks.map((t) => (t.id === task.id ? this.serializeTask(task) : t))
 
       // 更新したタスクを保存
-      localStorage.setItem("gantt_tasks", JSON.stringify(updatedTasks))
+      localStorage.setItem("gantt_tasks", JSON.stringify(updatedSerializedTasks))
 
       return {
         success: true,
@@ -116,19 +122,23 @@ export class TaskApiClient {
   /**
    * タスクを削除
    */
-  static async deleteTask(taskId: string): Promise<ApiResponse<boolean>> {
+  static async deleteTask(taskId: string): Promise<{
+    success: boolean
+    data: boolean
+    error?: string
+  }> {
     try {
       await new Promise((resolve) => setTimeout(resolve, SIMULATED_DELAY))
 
       // 既存のタスクを取得
       const tasksJson = localStorage.getItem("gantt_tasks")
-      const tasks = tasksJson ? JSON.parse(tasksJson).map(this.deserializeTask) : []
+      const serializedTasks: SerializedTask[] = tasksJson ? JSON.parse(tasksJson) : []
 
       // タスクを削除
-      const filteredTasks = tasks.filter((t) => t.id !== taskId)
+      const filteredSerializedTasks = serializedTasks.filter((t) => t.id !== taskId)
 
       // 更新したタスクリストを保存
-      localStorage.setItem("gantt_tasks", JSON.stringify(filteredTasks.map(this.serializeTask)))
+      localStorage.setItem("gantt_tasks", JSON.stringify(filteredSerializedTasks))
 
       return {
         success: true,
@@ -147,7 +157,7 @@ export class TaskApiClient {
   /**
    * 日付オブジェクトをシリアライズ可能な形式に変換
    */
-  private static serializeTask(task: Task): any {
+  private static serializeTask(task: Task): SerializedTask {
     return {
       ...task,
       startDate: task.startDate.toISOString(),
@@ -158,11 +168,11 @@ export class TaskApiClient {
   /**
    * シリアライズされたタスクを元のオブジェクトに戻す
    */
-  private static deserializeTask(task: any): Task {
+  private static deserializeTask(serializedTask: SerializedTask): Task {
     return {
-      ...task,
-      startDate: new Date(task.startDate),
-      endDate: new Date(task.endDate),
+      ...serializedTask,
+      startDate: new Date(serializedTask.startDate),
+      endDate: new Date(serializedTask.endDate),
     }
   }
 }
